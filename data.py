@@ -1,11 +1,14 @@
 import streamlit as st
 from groq import Groq
+
+# Hide the GitHub link and the action button in Streamlit
 hide_github_style = """
 <style>
 a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none;}
 </style>
 """
 st.markdown(hide_github_style, unsafe_allow_html=True)
+
 # Initialize the client (use your API key here)
 client = Groq(api_key="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")
 
@@ -71,35 +74,39 @@ if 'questions_generated' not in st.session_state:
 if 'personalized_track_generated' not in st.session_state:
     st.session_state.personalized_track_generated = False
 
+if 'loop_count' not in st.session_state:
+    st.session_state.loop_count = 0  # Track the number of loops/iterations
+
 # Step 1: If the assessment is not completed, show topic and subtopic inputs
 if not st.session_state.assessment_completed:
-    # Ask the user to enter a main topic
-    st.header('Enter a Main Topic')
-    user_main_topic = st.text_input("Enter a main topic you'd like to focus on (e.g., Math, Physics, Chemistry):")
-
-    # Ask the user to enter subtopics dynamically
-    st.header('Enter Subtopics for Your Main Topic')
-    user_subtopics = st.text_input("Enter subtopics for your main topic (comma separated):")
+    if st.session_state.loop_count == 0:
+        # First loop iteration (initial input)
+        st.header('Enter a Main Topic')
+        user_main_topic = st.text_input("Enter a main topic you'd like to focus on (e.g., Math, Physics, Chemistry):")
+        
+        st.header('Enter Subtopics for Your Main Topic')
+        user_subtopics = st.text_input("Enter subtopics for your main topic (comma separated):")
+    else:
+        # Subsequent loop iterations - keeping the same topic/subtopics
+        user_main_topic = st.session_state.user_main_topic
+        user_subtopics = st.session_state.user_subtopics_list
+        st.write(f"Reassessing level based on previous session... Focusing on: {user_main_topic}")
 
     # Generate questions once the user submits the main topic and subtopics
-    if user_main_topic and user_subtopics and st.button('Submit and Generate Questions'):
-        # Split the subtopics by commas to create a list
-        subtopics_list = [sub.strip() for sub in user_subtopics.split(',') if sub.strip()]
-        
-        if subtopics_list:
-            st.write(f"Generating questions based on the main topic: {user_main_topic} and subtopics: {', '.join(subtopics_list)}")
-            
-            # Step 3: Generate questions for multiple levels
-            level_based_questions = generate_level_based_questions(user_main_topic, subtopics_list)
-            
-            # Store the questions and answers in the session state
-            st.session_state.level_based_questions = level_based_questions
-            st.session_state.user_main_topic = user_main_topic
-            st.session_state.subtopics_list = subtopics_list
-            st.session_state.answers = [""] * len(level_based_questions)
-            
-            # Mark that questions have been generated
-            st.session_state.questions_generated = True
+    if (user_main_topic and user_subtopics) or st.session_state.loop_count > 0:
+        if st.session_state.loop_count == 0:
+            subtopics_list = [sub.strip() for sub in user_subtopics.split(',') if sub.strip()]
+            st.session_state.user_subtopics_list = subtopics_list
+        else:
+            subtopics_list = st.session_state.user_subtopics_list
+
+        st.write(f"Generating questions based on the main topic: {user_main_topic} and subtopics: {', '.join(subtopics_list)}")
+        level_based_questions = generate_level_based_questions(user_main_topic, subtopics_list)
+
+        st.session_state.level_based_questions = level_based_questions
+        st.session_state.user_main_topic = user_main_topic
+        st.session_state.answers = [""] * len(level_based_questions)
+        st.session_state.questions_generated = True
 
 # Step 2: Display the questions and collect answers once they are generated
 if st.session_state.questions_generated and not st.session_state.assessment_completed:
@@ -111,16 +118,13 @@ if st.session_state.questions_generated and not st.session_state.assessment_comp
     if st.button('Submit Answers and Determine Level'):
         st.write("Thank you for your answers! Analyzing your level...")
 
-        # Check if the user left any answer empty
         empty_answers = [ans for ans in answers if not ans.strip()]
+        correct_answers = len([ans for ans in answers if ans.strip()])  # Count non-empty answers
 
         # Logic to determine the level based on answers
-        correct_answers = len([ans for ans in answers if ans.strip()])  # Count non-empty answers
         if len(empty_answers) == len(answers):
-            # If no answers are provided, consider the user Beginner by default
             user_level = 'Beginner'
         else:
-            # Determine the user's level based on number of correct answers (dummy logic for now)
             if correct_answers >= len(answers) * 0.8:
                 user_level = 'Advanced'
             elif correct_answers >= len(answers) * 0.6:
@@ -133,7 +137,7 @@ if st.session_state.questions_generated and not st.session_state.assessment_comp
                 user_level = 'Beginner'
 
         st.session_state.user_level = user_level
-        st.session_state.assessment_completed = True  # Mark the assessment as completed
+        st.session_state.assessment_completed = True
 
 # Step 3: After the assessment, show the results and hide the input fields
 if st.session_state.assessment_completed:
@@ -147,7 +151,6 @@ if st.session_state.assessment_completed:
         personalized_track = generate_personalized_learning_track(user_main_topic, user_level)
         st.write(personalized_track)
 
-        # Mark that personalized track has been generated
         st.session_state.personalized_track_generated = True
 
 # Step 4: Add an assessment for the personalized learning track
@@ -155,15 +158,11 @@ if st.session_state.personalized_track_generated:
     st.write("Now that you've studied the suggested topics, it's time for an assessment!")
     
     if st.button("Start Assessment"):
-        # Generate questions from the personalized learning track
-        assessment_questions = generate_level_based_questions(st.session_state.user_main_topic, st.session_state.subtopics_list)
-        
-        # Store the assessment questions and answers in session state
+        assessment_questions = generate_level_based_questions(st.session_state.user_main_topic, st.session_state.user_subtopics_list)
         st.session_state.assessment_questions = assessment_questions
         st.session_state.assessment_answers = [""] * len(assessment_questions)
 
 if 'assessment_questions' in st.session_state:
-    # Display assessment questions based on personalized learning track
     st.write("Assessment: Answer the following questions based on your personalized learning track:")
     for i, (level, subtopic, question) in enumerate(st.session_state.assessment_questions):
         st.write(f"{level.capitalize()} Level - {subtopic.capitalize()} Question {i + 1}: {question}")
@@ -180,19 +179,22 @@ if 'assessment_questions' in st.session_state:
             if user_answer:
                 feedback = generate_feedback(question, user_answer)
                 feedback_list.append(f"Feedback for Question {i + 1}: {feedback}")
-                correct_answers += 1  # Assuming all filled answers are correct for simplicity
+                correct_answers += 1
             else:
-                # For unanswered questions, generate a personalized tip using the Groq API
                 tip = generate_personalized_tip(question, level)
                 feedback_list.append(f"Question {i + 1} was not answered. Tip: {tip}")
 
-        # Display the number of correct answers
         st.write(f"You answered {correct_answers} out of {total_questions} questions correctly!")
         
-        # Display feedback for each question
         for feedback in feedback_list:
             st.write(feedback)
 
-        # Suggest revisiting topics if not all questions were answered
         if correct_answers < total_questions:
             st.write("Consider revisiting the unanswered questions to improve your understanding.")
+
+        # Reset the state and loop the process again for reassessment
+        if st.button('Reassess Level and Continue'):
+            st.session_state.assessment_completed = False
+            st.session_state.questions_generated = False
+            st.session_state.personalized_track_generated = False
+            st.session_state.loop_count += 1
