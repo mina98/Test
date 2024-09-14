@@ -1,6 +1,11 @@
 import streamlit as st
 from groq import Groq
-
+hide_github_style = """
+<style>
+a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none;}
+</style>
+"""
+st.markdown(hide_github_style, unsafe_allow_html=True)
 # Initialize the client (use your API key here)
 client = Groq(api_key="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")
 
