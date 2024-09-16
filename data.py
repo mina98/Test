@@ -12,12 +12,26 @@ st.markdown(hide_github_style, unsafe_allow_html=True)
 # Initialize the client (use your API key here)
 client = Groq(api_key="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")
 
-def prompt(text, base=''):
-    """ Helper function to send a prompt to the Groq API and return a response. """
+# Define the strict and creative prompts with different configurations
+prompt_creative = {
+    "system_message": "You are a teacher. You should create content or questions based on the topic.",
+    "temperature": 0.8,
+}
+
+prompt_strict = {
+    "system_message": "You are a teacher. You should evaluate the answer based on the question.",
+    "temperature": 0.2,
+}
+
+def prompt(text, prompt_type, base=''):
+    """ Helper function to send a prompt to the Groq API and return a response using the prompt type. """
     completion = client.chat.completions.create(
         model="llama-3.1-70b-versatile",
-        messages=[{"role": "user", "content": base + text}],
-        temperature=0.5,
+        messages=[
+            {"role": "system", "content": prompt_type["system_message"]},
+            {"role": "user", "content": base + text}
+        ],
+        temperature=prompt_type["temperature"],
         max_tokens=1024,
         top_p=1,
         stream=True,
@@ -31,11 +45,52 @@ def prompt(text, base=''):
 def generate_question(main_topic, subtopic, level):
     """Generate a question dynamically based on the level, main topic, and subtopic."""
     prompt_text = f"Generate a {level} level question in {main_topic}, specifically focusing on {subtopic}. Make the question unique and appropriate for someone at the {level} level."
-    question = prompt(text=main_topic, base=prompt_text)
+    
+    # Use creative prompt params
+    question = prompt(text=main_topic, prompt_type=prompt_creative, base=prompt_text)
     return question
 
+def evaluate_answer(question, answer):
+    """Strict evaluation of the answer based on the question."""
+    prompt_text = f"Evaluate the following answer strictly: {answer} to the question: {question}. Do not provide hints, just the evaluation."
+    
+    # Use strict prompt params
+    evaluation = prompt(text=prompt_text, prompt_type=prompt_strict)
+    return evaluation
+
+def generate_tip(question, answer):
+    """Generate a tip for the user's answer without generating a full answer explanation."""
+    tip_prompt = f"Provide helpful tips or hints to improve understanding of the following question: {question}. Avoid generating a full answer."
+    
+    # Use creative prompt params
+    tip = prompt(tip_prompt, prompt_type=prompt_creative, base="Provide tips only.")
+    return tip
+
+def generate_personalized_tip(question, level):
+    """Generate personalized tips for unanswered questions based on the user's level."""
+    tip_prompt = f"Provide personalized tips for a {level} level learner based on this question: {question}."
+    
+    # Use creative prompt params
+    tip = prompt(tip_prompt, prompt_type=prompt_creative, base="Provide personalized advice.")
+    return tip
+
+def generate_personalized_learning_track(main_topic, level):
+    """Generate personalized learning track dynamically from Groq API."""
+    track_prompt = f"Generate a personalized learning track for a {level} learner in the topic of {main_topic}."
+    
+    # Use creative prompt params
+    track = prompt(track_prompt, prompt_type=prompt_creative, base="Provide a dynamic learning track.")
+    return track
+
+def get_next_level(current_level):
+    """Function to get the next level based on the current level."""
+    levels = ['Beginner', 'Elementary', 'Intermediate', 'Upper Intermediate', 'Advanced']
+    if current_level in levels and levels.index(current_level) < len(levels) - 1:
+        return levels[levels.index(current_level) + 1]
+    return current_level  # If the user is already at the highest level
+
 def generate_level_based_questions(main_topic, subtopics, current_level, mix_next_level=False):
-    """Generate questions for current and potentially next level based on progress."""
+    """Generate questions for the current level and possibly the next level."""
     levels = ['Beginner', 'Elementary', 'Intermediate', 'Upper Intermediate', 'Advanced']
     questions = []
     
@@ -51,31 +106,6 @@ def generate_level_based_questions(main_topic, subtopics, current_level, mix_nex
             questions.append((next_level, subtopic, generate_question(main_topic, subtopic.strip(), next_level)))
     
     return questions
-
-def generate_tip(question, answer):
-    """Generate a tip for the user's answer without generating a full answer explanation."""
-    tip_prompt = f"Provide helpful tips or hints to improve understanding of the following question: {question}. Avoid generating a full answer."
-    tip = prompt(tip_prompt, base="Provide tips only.")
-    return tip
-
-def generate_personalized_tip(question, level):
-    """Generate personalized tips for unanswered questions based on the user's level."""
-    tip_prompt = f"Provide personalized tips for a {level} level learner based on this question: {question}."
-    tip = prompt(tip_prompt, base="Provide personalized advice.")
-    return tip
-
-def generate_personalized_learning_track(main_topic, level):
-    """Generate personalized learning track dynamically from Groq API."""
-    track_prompt = f"Generate a personalized learning track for a {level} learner in the topic of {main_topic}."
-    track = prompt(track_prompt, base="Provide a dynamic learning track.")
-    return track
-
-def get_next_level(current_level):
-    """Function to get the next level based on the current level."""
-    levels = ['Beginner', 'Elementary', 'Intermediate', 'Upper Intermediate', 'Advanced']
-    if current_level in levels and levels.index(current_level) < len(levels) - 1:
-        return levels[levels.index(current_level) + 1]
-    return current_level  # If the user is already at the highest level
 
 # Streamlit app layout
 st.title('Personalized Learning Level Assessment')
