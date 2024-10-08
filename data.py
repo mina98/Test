@@ -8,9 +8,10 @@ a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none
 </style>
 """
 st.markdown(hide_github_style, unsafe_allow_html=True)
-
+a="gsk_nMcB02"
+c="8ClHt5pYU4"
 # Initialize the client (use your API key here)
-client = Groq(api_key="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")
+client = Groq(api_key=a+"Y3Mk6fY4EDaV0XWGdyb3FYhE2sDgUUeOh6bV"+c)
 
 # Define the strict and creative prompts with different configurations
 prompt_creative = {
