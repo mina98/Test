@@ -28,7 +28,7 @@ prompt_strict = {
 def prompt(text, prompt_type, base=''):
     """ Helper function to send a prompt to the Groq API and return a response using the prompt type. """
     completion = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
+        model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": prompt_type["system_message"]},
             {"role": "user", "content": base + text}
