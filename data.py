@@ -11,7 +11,6 @@ st.markdown(hide_github_style, unsafe_allow_html=True)
 a="gsk_9Pa"
 c="aXwe"
 
-x4HWcCgNRdhnZZusFWGdyb3FYvea7ZIQUdTuZJnvekqdO
 # Initialize the client (use your API key here)
 client = Groq(api_key=a+"x4HWcCgNRdhnZZusFWGdyb3FYvea7ZIQUdTuZJnvekqdO"+c)
 
