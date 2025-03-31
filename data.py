@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 from groq import Groq
 
-# -----------------------------------------------------
-# Hide GitHub link and Streamlit action button
-# -----------------------------------------------------
+# ----------------------------------------------------
+# 1) Hide GitHub link and Streamlit action button
+# ----------------------------------------------------
 HIDE_GITHUB_STYLE = """
 <style>
 a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none;}
@@ -12,16 +12,16 @@ a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none
 """
 st.markdown(HIDE_GITHUB_STYLE, unsafe_allow_html=True)
 
-# -----------------------------------------------------
-# API key initialization (consider st.secrets for production)
-# -----------------------------------------------------
+# ----------------------------------------------------
+# 2) API Key Setup
+# ----------------------------------------------------
 a = "gsk_9Pa"
 c = "aXwe"
 client = Groq(api_key=a + "x4HWcCgNRdhnZZusFWGdyb3FYvea7ZIQUdTuZJnvekqdO" + c)
 
-# -----------------------------------------------------
-# Prompt and AI helper functions (wrapped in spinners where needed)
-# -----------------------------------------------------
+# ----------------------------------------------------
+# 3) Prompt Functions: No Spinners, No Streaming
+# ----------------------------------------------------
 def prompt(text, prompt_type, base=''):
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -32,13 +32,11 @@ def prompt(text, prompt_type, base=''):
         temperature=prompt_type["temperature"],
         max_tokens=1024,
         top_p=1,
-        stream=True,
+        stream=False,  # no streaming
         stop=None,
     )
-    response = ""
-    for chunk in completion:
-        response += chunk.choices[0].delta.content or ""
-    return response
+    # Directly read the response
+    return completion.choices[0].message.content
 
 prompt_creative = {
     "system_message": "You are a teacher. You should create content or questions based on the topic.",
@@ -50,120 +48,109 @@ prompt_strict = {
 }
 
 def generate_question(main_topic, subtopic, level):
-    prompt_text = (f"Generate a {level} level question in {main_topic}, specifically focusing on {subtopic}. "
-                   "Make the question unique and appropriate for someone at the specified level.")
-    with st.spinner("Generating question..."):
-        return prompt(text=main_topic, prompt_type=prompt_creative, base=prompt_text)
+    text = f"Generate a {level} level question in {main_topic}, focusing on {subtopic}."
+    return prompt(text, prompt_creative, base="Make it unique: ")
 
 def evaluate_answer(question, answer):
-    prompt_text = (f"Evaluate the following answer strictly: {answer} to the question: {question}. "
-                   "Do not provide hints, just the evaluation.")
-    with st.spinner("Evaluating answer..."):
-        return prompt(text=prompt_text, prompt_type=prompt_strict)
-
-def generate_personalized_tip(question, level):
-    tip_prompt = f"Provide personalized tips for a {level} level learner based on this question: {question}."
-    with st.spinner("Generating tip..."):
-        return prompt(tip_prompt, prompt_type=prompt_creative, base="Provide personalized advice.")
-
-def generate_personalized_learning_track(main_topic, level):
-    track_prompt = f"Generate a personalized learning track for a {level} learner in the topic of {main_topic}."
-    with st.spinner("Generating learning track..."):
-        return prompt(track_prompt, prompt_type=prompt_creative, base="Provide a dynamic learning track.")
+    text = f"Strictly evaluate: {answer} for Q: {question}."
+    return prompt(text, prompt_strict)
 
 def generate_explanation(question, answer):
-    explanation_prompt = {
-        "system_message": "You are a teacher. Provide a detailed explanation of the correct answer.",
-        "temperature": 0.3,
-    }
-    prompt_text = f"Give a thorough, step-by-step explanation for the correct answer to the question: {question}"
-    with st.spinner("Generating explanation..."):
-        return prompt(text=prompt_text, prompt_type=explanation_prompt, base="Detailed solution: ")
+    text = f"Give a thorough explanation for the correct answer to: {question}, user answer: {answer}"
+    return prompt(text, prompt_creative, base="Detailed explanation: ")
+
+def generate_personalized_tip(question, level):
+    text = f"Provide tips for a {level} learner about question: {question}"
+    return prompt(text, prompt_creative, base="Personalized tips: ")
+
+def generate_personalized_learning_track(main_topic, level):
+    text = f"Create a personalized {level} learning track for: {main_topic}"
+    return prompt(text, prompt_creative, base="Dynamic track: ")
 
 def get_next_level(current_level):
     levels = ["Beginner", "Elementary", "Intermediate", "Upper Intermediate", "Advanced"]
-    if current_level in levels and levels.index(current_level) < len(levels) - 1:
-        return levels[levels.index(current_level) + 1]
+    if current_level in levels:
+        idx = levels.index(current_level)
+        if idx < len(levels) - 1:
+            return levels[idx + 1]
     return current_level
 
 def generate_level_based_questions(main_topic, subtopics, current_level, mix_next_level=False):
     questions = []
     next_level = get_next_level(current_level)
-    for subtopic in subtopics:
-        questions.append((current_level, subtopic, generate_question(main_topic, subtopic.strip(), current_level)))
+    for sub in subtopics:
+        questions.append( (current_level, sub, generate_question(main_topic, sub, current_level)) )
         if mix_next_level and current_level != next_level:
-            questions.append((next_level, subtopic, generate_question(main_topic, subtopic.strip(), next_level)))
+            questions.append( (next_level, sub, generate_question(main_topic, sub, next_level)) )
     return questions
 
-# -----------------------------------------------------
-# Session state initialization
-# -----------------------------------------------------
-if "current_step" not in st.session_state:
-    st.session_state.current_step = 1  # Step 1: Topic entry
-if "user_main_topic" not in st.session_state:
-    st.session_state.user_main_topic = ""
-if "user_subtopics_list" not in st.session_state:
-    st.session_state.user_subtopics_list = []
+# ----------------------------------------------------
+# 4) Session State Initialization
+# ----------------------------------------------------
+if "step" not in st.session_state:
+    st.session_state.step = 1
+
+if "main_topic" not in st.session_state:
+    st.session_state.main_topic = ""
+if "subtopics" not in st.session_state:
+    st.session_state.subtopics = []
+if "questions" not in st.session_state:
+    st.session_state.questions = []
+if "answers" not in st.session_state:
+    st.session_state.answers = []
+
 if "user_level" not in st.session_state:
     st.session_state.user_level = "Beginner"
 if "xp" not in st.session_state:
     st.session_state.xp = 0
-if "level_based_questions" not in st.session_state:
-    st.session_state.level_based_questions = []
-if "answers" not in st.session_state:
-    st.session_state.answers = []
-if "assessment_questions" not in st.session_state:
-    st.session_state.assessment_questions = []
-if "assessment_answers" not in st.session_state:
-    st.session_state.assessment_answers = []
 
-# -----------------------------------------------------
-# App Title
-# -----------------------------------------------------
-st.title("Personalized Learning Level Assessment")
+if "final_questions" not in st.session_state:
+    st.session_state.final_questions = []
+if "final_answers" not in st.session_state:
+    st.session_state.final_answers = []
 
-# -----------------------------------------------------
-# STEP 1: Topic & Subtopic Form
-# -----------------------------------------------------
-if st.session_state.current_step == 1:
-    st.header("Step 1: Enter Main Topic & Subtopics")
-    with st.form(key="topic_form"):
-        main_topic = st.text_input("Enter a main topic (e.g., Math, Physics, Chemistry):", 
-                                   value=st.session_state.user_main_topic)
-        subtopics_str = st.text_input("Enter subtopics (comma separated):", 
-                                      value=", ".join(st.session_state.user_subtopics_list))
-        submitted = st.form_submit_button("Submit Topic")
-    if submitted:
-        if main_topic and subtopics_str:
-            st.session_state.user_main_topic = main_topic
-            st.session_state.user_subtopics_list = [s.strip() for s in subtopics_str.split(",") if s.strip()]
-            # Generate questions for each level
-            all_questions = []
-            for lvl in ["Beginner", "Elementary", "Intermediate", "Upper Intermediate", "Advanced"]:
-                all_questions.extend(generate_level_based_questions(main_topic, st.session_state.user_subtopics_list, lvl))
-            st.session_state.level_based_questions = all_questions
-            st.session_state.answers = [""] * len(all_questions)
-            st.session_state.current_step = 2
+# ----------------------------------------------------
+# 5) Page Title
+# ----------------------------------------------------
+st.title("Minimal Multi-Step App (No Spinners, Single Click)")
+
+# ----------------------------------------------------
+# STEP 1: Enter Topic & Subtopics
+# ----------------------------------------------------
+if st.session_state.step == 1:
+    st.header("Step 1: Topic & Subtopics")
+    with st.form(key="form_step1"):
+        topic_input = st.text_input("Main Topic:", value=st.session_state.main_topic)
+        subs_input = st.text_input("Subtopics (comma separated):", value=", ".join(st.session_state.subtopics))
+        submit1 = st.form_submit_button("Generate Questions")
+    if submit1:
+        if topic_input and subs_input:
+            st.session_state.main_topic = topic_input
+            st.session_state.subtopics = [s.strip() for s in subs_input.split(",") if s.strip()]
+            # Generate questions for all levels
+            combined = []
+            for lvl in ["Beginner","Elementary","Intermediate","Upper Intermediate","Advanced"]:
+                combined.extend(generate_level_based_questions(st.session_state.main_topic, st.session_state.subtopics, lvl))
+            st.session_state.questions = combined
+            st.session_state.answers = [""] * len(combined)
+            st.session_state.step = 2
             st.experimental_rerun()
         else:
-            st.warning("Please enter both a main topic and at least one subtopic.")
+            st.warning("Please fill both fields.")
 
-# -----------------------------------------------------
-# STEP 2: Display Questions & Collect Answers
-# -----------------------------------------------------
-elif st.session_state.current_step == 2:
-    st.header("Step 2: Answer the Following Questions")
-    for i, (lvl, subtopic, question) in enumerate(st.session_state.level_based_questions):
-        st.write(f"**{lvl} - {subtopic}**: {question}")
-        st.session_state.answers[i] = st.text_area(f"Your Answer for Q{i+1}:", 
-                                                   value=st.session_state.answers[i],
-                                                   key=f"ans_{i}")
-    if st.button("Submit Answers & Determine Level"):
-        answers = st.session_state.answers
-        # For demo, we count non-empty answers as "correct"
-        correct_count = len([ans for ans in answers if ans.strip()])
-        total = len(answers)
-        ratio = correct_count / total if total else 0
+# ----------------------------------------------------
+# STEP 2: Show Questions, Collect Answers
+# ----------------------------------------------------
+elif st.session_state.step == 2:
+    st.header("Step 2: Answer the Questions")
+    for i, (lvl, sub, q) in enumerate(st.session_state.questions):
+        st.write(f"**({lvl})** {sub} => {q}")
+        st.session_state.answers[i] = st.text_area(f"Answer {i+1}", value=st.session_state.answers[i], key=f"a_{i}")
+    if st.button("Submit Answers"):
+        # Simple scoring: non-empty answers
+        total = len(st.session_state.answers)
+        correct = sum(1 for a in st.session_state.answers if a.strip())
+        ratio = correct / total if total else 0
         if ratio >= 0.8:
             st.session_state.user_level = "Advanced"
         elif ratio >= 0.6:
@@ -174,108 +161,88 @@ elif st.session_state.current_step == 2:
             st.session_state.user_level = "Elementary"
         else:
             st.session_state.user_level = "Beginner"
-        st.session_state.xp += correct_count * 10
-        st.session_state.current_step = 3
+        st.session_state.xp += correct * 10
+        st.session_state.step = 3
         st.experimental_rerun()
 
-# -----------------------------------------------------
-# STEP 3: Show Assessment Results & Generate Learning Track
-# -----------------------------------------------------
-elif st.session_state.current_step == 3:
-    st.header("Step 3: Assessment Results")
-    st.write(f"Your assessed proficiency level is: **{st.session_state.user_level}**")
-    st.write(f"**XP Points:** {st.session_state.xp}")
-    answered = sum(1 for ans in st.session_state.answers if ans.strip())
-    total = len(st.session_state.answers)
-    if total:
-        st.progress(answered / total)
-    if st.button("Generate Personalized Learning Track"):
-        track = generate_personalized_learning_track(st.session_state.user_main_topic, st.session_state.user_level)
-        st.session_state.personalized_track = track
-        st.session_state.current_step = 4
+# ----------------------------------------------------
+# STEP 3: Show Level, Generate Personalized Track
+# ----------------------------------------------------
+elif st.session_state.step == 3:
+    st.header("Step 3: Results & Personalized Track")
+    st.write(f"**Your level:** {st.session_state.user_level}")
+    st.write(f"**XP:** {st.session_state.xp}")
+    if st.button("Generate Learning Track"):
+        track = generate_personalized_learning_track(st.session_state.main_topic, st.session_state.user_level)
+        st.session_state.track = track
+        st.session_state.step = 4
         st.experimental_rerun()
 
-# -----------------------------------------------------
-# STEP 4: Show Learning Track & Start Final Assessment
-# -----------------------------------------------------
-elif st.session_state.current_step == 4:
-    st.header("Step 4: Your Personalized Learning Track")
-    track = st.session_state.get("personalized_track", "")
-    if track:
-        st.write(track)
-    else:
-        st.info("No learning track generated.")
+# ----------------------------------------------------
+# STEP 4: Show Track, Start Final Assessment
+# ----------------------------------------------------
+elif st.session_state.step == 4:
+    st.header("Step 4: Personalized Learning Track")
+    st.write(st.session_state.get("track","[No track generated]"))
     if st.button("Start Final Assessment"):
-        mix_next = (st.session_state.user_level != "Advanced")
-        final_qs = generate_level_based_questions(st.session_state.user_main_topic, 
-                                                  st.session_state.user_subtopics_list, 
-                                                  st.session_state.user_level, mix_next_level=mix_next)
-        st.session_state.assessment_questions = final_qs
-        st.session_state.assessment_answers = [""] * len(final_qs)
-        st.session_state.current_step = 5
+        # final questions
+        mix = (st.session_state.user_level != "Advanced")
+        fq = generate_level_based_questions(st.session_state.main_topic, st.session_state.subtopics, st.session_state.user_level, mix_next_level=mix)
+        st.session_state.final_questions = fq
+        st.session_state.final_answers = [""]*len(fq)
+        st.session_state.step = 5
         st.experimental_rerun()
 
-# -----------------------------------------------------
-# STEP 5: Final Assessment - Answer Questions
-# -----------------------------------------------------
-elif st.session_state.current_step == 5:
-    st.header("Step 5: Final Assessment - Answer the Questions")
-    for i, (lvl, subtopic, question) in enumerate(st.session_state.assessment_questions):
-        st.write(f"**{lvl} - {subtopic}**: {question}")
-        st.session_state.assessment_answers[i] = st.text_area(f"Your Answer for Final Q{i+1}:", 
-                                                               value=st.session_state.assessment_answers[i],
-                                                               key=f"final_ans_{i}")
-    if st.button("Submit Final Assessment"):
-        st.session_state.current_step = 6
-        st.experimental_rerun()
-
-# -----------------------------------------------------
-# STEP 6: Final Assessment - Evaluation & Explanation Table
-# -----------------------------------------------------
-elif st.session_state.current_step == 6:
-    st.header("Step 6: Final Assessment - Evaluation & Explanation")
-    data = []
-    for i, (lvl, subtopic, question) in enumerate(st.session_state.assessment_questions):
-        ans = st.session_state.assessment_answers[i].strip()
-        if ans:
-            eval_result = evaluate_answer(question, ans)
-            explanation = generate_explanation(question, ans)
-        else:
-            eval_result = "No answer provided"
-            explanation = generate_personalized_tip(question, lvl)
-        data.append({
-            "Question": question,
-            "Your Answer": ans if ans else "[No answer]",
-            "Evaluation": eval_result,
-            "Explanation": explanation
-        })
-    df = pd.DataFrame(data)
-    # Use st.dataframe for a nicer appearance (scrollable and responsive)
-    st.dataframe(df)
-    correct_count = len([ans for ans in st.session_state.assessment_answers if ans.strip()])
-    total_qs = len(st.session_state.assessment_questions)
-    st.write(f"You answered {correct_count} out of {total_qs} questions.")
-    if total_qs > 0 and (correct_count / total_qs) > 0.7:
-        st.success("Congratulations! You passed the final assessment.")
-        if st.button("Move to Next Level"):
+# ----------------------------------------------------
+# STEP 5: Final Assessment (Evaluation & Explanation in Table)
+# ----------------------------------------------------
+elif st.session_state.step == 5:
+    st.header("Step 5: Final Assessment")
+    # We will automatically do the evaluation after the user clicks "Finalize"
+    for i, (lvl, sub, q) in enumerate(st.session_state.final_questions):
+        st.write(f"**({lvl})** {sub} => {q}")
+        st.session_state.final_answers[i] = st.text_area(f"Final Answer {i+1}", value=st.session_state.final_answers[i], key=f"fa_{i}")
+    if st.button("Finalize Assessment"):
+        # Build a results table
+        data = []
+        correct = 0
+        total = len(st.session_state.final_questions)
+        for i, (lvl, sub, q) in enumerate(st.session_state.final_questions):
+            ans = st.session_state.final_answers[i].strip()
+            if ans:
+                eval_ = evaluate_answer(q, ans)
+                expl_ = generate_explanation(q, ans)
+                correct+=1
+            else:
+                eval_ = "No answer"
+                expl_ = generate_personalized_tip(q, lvl)
+            data.append({
+                "Question": q,
+                "YourAnswer": ans if ans else "[No Answer]",
+                "Evaluation": eval_,
+                "Explanation": expl_,
+            })
+        df = pd.DataFrame(data)
+        st.dataframe(df)
+        st.write(f"You answered {correct} out of {total} questions.")
+        ratio = correct/total if total else 0
+        if ratio>0.7:
+            st.success("You passed! Move up a level if you wish.")
             st.session_state.user_level = get_next_level(st.session_state.user_level)
-            st.session_state.xp += correct_count * 10
-            # Reset for a new cycle (start from Step 1)
-            st.session_state.current_step = 1
+            st.session_state.xp += correct*10
+        # Let the user proceed to a new cycle or end
+        if st.button("Restart from Step 1"):
+            st.session_state.step = 1
             st.experimental_rerun()
 
-# -----------------------------------------------------
-# DOWNLOAD SUMMARY (available from Step 1 onward)
-# -----------------------------------------------------
-def generate_summary():
-    summary = f"Main Topic: {st.session_state.user_main_topic}\n"
-    summary += f"Subtopics: {', '.join(st.session_state.user_subtopics_list)}\n"
-    summary += f"Proficiency Level: {st.session_state.user_level}\n"
-    summary += f"XP Points: {st.session_state.xp}\n"
-    summary += "Final Assessment Answers:\n"
-    for i, ans in enumerate(st.session_state.assessment_answers):
-        summary += f"Q{i+1}: {ans}\n"
-    return summary
+# ----------------------------------------------------
+# OPTIONAL: Download summary
+# ----------------------------------------------------
+def summary():
+    s = f"Topic: {st.session_state.main_topic}\n"
+    s += f"Subtopics: {', '.join(st.session_state.subtopics)}\n"
+    s += f"Level: {st.session_state.user_level}\n"
+    s += f"XP: {st.session_state.xp}\n"
+    return s
 
-summary_str = generate_summary()
-st.download_button("Download Your Learning Summary", summary_str, file_name="learning_summary.txt")
+st.download_button("Download Summary", summary(), file_name="summary.txt")
