@@ -116,7 +116,7 @@ if st.button("Try Demo Mode"):
     st.session_state.user_main_topic = "Math"
     st.session_state.user_subtopics_list = ["Algebra", "Geometry", "Calculus"]
     st.session_state.loop_count = 0
-    st.experimental_rerun()
+    st.stop()  # Stop execution so that the updated session state is used on next run
 
 # --------------------- Step 1: Input for Topic and Subtopics (Form) --------------------- #
 if not st.session_state.assessment_completed and not st.session_state.questions_generated:
@@ -136,17 +136,14 @@ if not st.session_state.assessment_completed and not st.session_state.questions_
         subtopics_list = [sub.strip() for sub in user_subtopics.split(',') if sub.strip()]
         st.session_state.user_subtopics_list = subtopics_list
         st.write(f"Generating questions for main topic: {user_main_topic} and subtopics: {', '.join(subtopics_list)}")
-        
-        # Generate questions for all levels for initial assessment
         level_based_questions = []
         levels = ['Beginner', 'Elementary', 'Intermediate', 'Upper Intermediate', 'Advanced']
         for level in levels:
             level_based_questions.extend(generate_level_based_questions(user_main_topic, subtopics_list, level))
-        
         st.session_state.level_based_questions = level_based_questions
         st.session_state.answers = [""] * len(level_based_questions)
         st.session_state.questions_generated = True
-        st.experimental_rerun()
+        st.stop()  # Stop execution so the updated state is used next
 
 # --------------------- Step 2: Display Questions and Collect Answers --------------------- #
 if st.session_state.questions_generated and not st.session_state.assessment_completed:
@@ -158,7 +155,6 @@ if st.session_state.questions_generated and not st.session_state.assessment_comp
     if st.button('Submit Answers and Determine Level'):
         empty_answers = [ans for ans in answers if not ans.strip()]
         correct_answers = len([ans for ans in answers if ans.strip()])
-        # Determine level based on percentage of non-empty answers
         if len(empty_answers) == len(answers):
             user_level = 'Beginner'
         else:
@@ -172,11 +168,10 @@ if st.session_state.questions_generated and not st.session_state.assessment_comp
                 user_level = 'Elementary'
             else:
                 user_level = 'Beginner'
-        
         st.session_state.user_level = user_level
         st.session_state.assessment_completed = True
         st.session_state.xp += correct_answers * 10
-        st.experimental_rerun()
+        st.stop()
 
 # --------------------- Step 3: Display Assessment Results & Learning Track --------------------- #
 if st.session_state.assessment_completed and not st.session_state.personalized_track_generated:
@@ -184,7 +179,6 @@ if st.session_state.assessment_completed and not st.session_state.personalized_t
     st.write(f"Your proficiency level is: **{st.session_state.user_level}**")
     st.write(f"**XP Points:** {st.session_state.xp}")
     st.progress(len([ans for ans in st.session_state.answers if ans.strip()]) / len(st.session_state.answers))
-    
     if st.button('Generate Personalized Learning Track'):
         user_level = st.session_state.user_level
         user_main_topic = st.session_state.user_main_topic
@@ -192,7 +186,7 @@ if st.session_state.assessment_completed and not st.session_state.personalized_t
         st.write("### Your Personalized Learning Track:")
         st.write(personalized_track)
         st.session_state.personalized_track_generated = True
-        st.experimental_rerun()
+        st.stop()
 
 # --------------------- Step 4: Final Assessment with Evaluation & Explanation --------------------- #
 if st.session_state.personalized_track_generated:
@@ -207,7 +201,7 @@ if st.session_state.personalized_track_generated:
         )
         st.session_state.assessment_questions = assessment_questions
         st.session_state.assessment_answers = [""] * len(assessment_questions)
-        st.experimental_rerun()
+        st.stop()
 
 if 'assessment_questions' in st.session_state:
     st.subheader("Answer the following assessment questions:")
@@ -222,19 +216,18 @@ if 'assessment_questions' in st.session_state:
             if st.button("Show Strict Evaluation", key=f"eval_{i}"):
                 evaluation = evaluate_answer(question, st.session_state.assessment_answers[i])
                 st.session_state.evaluations[i] = evaluation
-                st.experimental_rerun()
+                st.stop()
             if st.session_state.evaluations.get(i):
                 st.write(f"**Evaluation for Question {i+1}:** {st.session_state.evaluations[i]}")
             if st.button("Show Explanation", key=f"explain_{i}"):
                 explanation = generate_explanation(question, st.session_state.assessment_answers[i])
                 st.session_state.explanations[i] = explanation
-                st.experimental_rerun()
+                st.stop()
             if st.session_state.explanations.get(i):
                 st.write(f"**Explanation for Question {i+1}:** {st.session_state.explanations[i]}")
         else:
             tip = generate_personalized_tip(question, level)
             st.write(f"Question {i+1} was not answered. Tip: {tip}")
-
     if st.button("Submit Final Assessment"):
         correct_answers = len([ans for ans in st.session_state.assessment_answers if ans.strip()])
         total_questions = len(st.session_state.assessment_questions)
@@ -249,9 +242,8 @@ if 'assessment_questions' in st.session_state:
                 st.session_state.questions_generated = False
                 st.session_state.personalized_track_generated = False
                 st.session_state.loop_count += 1
-                st.experimental_rerun()
+                st.stop()
 
-# --------------------- Optional: Download Progress Summary --------------------- #
 def generate_summary():
     summary = f"Main Topic: {st.session_state.get('user_main_topic', '')}\n"
     summary += f"Subtopics: {', '.join(st.session_state.get('user_subtopics_list', []))}\n"
