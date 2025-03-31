@@ -2,9 +2,16 @@ import streamlit as st
 import pandas as pd
 from groq import Groq
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
+# Helper function for immediate reload (redirect)
+# -------------------------------------------------------------------
+def redirect():
+    # Inject a script tag that reloads the page
+    st.markdown("<script>window.location.reload()</script>", unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
 # Hide GitHub link and Streamlit action button
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 HIDE_GITHUB_STYLE = """
 <style>
 a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none;}
@@ -12,16 +19,16 @@ a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none
 """
 st.markdown(HIDE_GITHUB_STYLE, unsafe_allow_html=True)
 
-# -----------------------------------------------------
-# API key initialization (consider st.secrets for production)
-# -----------------------------------------------------
+# -------------------------------------------------------------------
+# API key initialization (consider using st.secrets for production)
+# -------------------------------------------------------------------
 a = "gsk_9Pa"
 c = "aXwe"
 client = Groq(api_key=a + "x4HWcCgNRdhnZZusFWGdyb3FYvea7ZIQUdTuZJnvekqdO" + c)
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # Prompt and AI helper functions
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 def prompt(text, prompt_type, base=''):
     completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -90,9 +97,9 @@ def generate_level_based_questions(main_topic, subtopics, current_level, mix_nex
             questions.append((next_level, subtopic, generate_question(main_topic, subtopic.strip(), next_level)))
     return questions
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # Session state initialization
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 if "current_step" not in st.session_state:
     st.session_state.current_step = 1  # Start with topic entry
 if "user_main_topic" not in st.session_state:
@@ -112,14 +119,14 @@ if "assessment_questions" not in st.session_state:
 if "assessment_answers" not in st.session_state:
     st.session_state.assessment_answers = []
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # App Title
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 st.title("Personalized Learning Level Assessment")
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 1: Topic & Subtopic Form
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 if st.session_state.current_step == 1:
     st.header("Step 1: Enter Main Topic & Subtopics")
     with st.form(key="topic_form"):
@@ -139,13 +146,13 @@ if st.session_state.current_step == 1:
             st.session_state.level_based_questions = all_questions
             st.session_state.answers = [""] * len(all_questions)
             st.session_state.current_step = 2
-            st.experimental_rerun()
+            redirect()
         else:
             st.warning("Please enter both a main topic and at least one subtopic.")
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 2: Display Questions & Collect Answers
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 elif st.session_state.current_step == 2:
     st.header("Step 2: Answer the Following Questions")
     for i, (lvl, subtopic, question) in enumerate(st.session_state.level_based_questions):
@@ -171,11 +178,11 @@ elif st.session_state.current_step == 2:
             st.session_state.user_level = "Beginner"
         st.session_state.xp += correct_count * 10
         st.session_state.current_step = 3
-        st.experimental_rerun()
+        redirect()
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 3: Show Assessment Results & Generate Learning Track
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 elif st.session_state.current_step == 3:
     st.header("Step 3: Assessment Results")
     st.write(f"Your assessed proficiency level is: **{st.session_state.user_level}**")
@@ -188,11 +195,11 @@ elif st.session_state.current_step == 3:
         track = generate_personalized_learning_track(st.session_state.user_main_topic, st.session_state.user_level)
         st.session_state.personalized_track = track
         st.session_state.current_step = 4
-        st.experimental_rerun()
+        redirect()
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 4: Show Learning Track & Start Final Assessment
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 elif st.session_state.current_step == 4:
     st.header("Step 4: Your Personalized Learning Track")
     track = st.session_state.get("personalized_track", "")
@@ -202,17 +209,20 @@ elif st.session_state.current_step == 4:
         st.info("No learning track generated.")
     if st.button("Start Final Assessment"):
         mix_next = (st.session_state.user_level != "Advanced")
-        final_qs = generate_level_based_questions(st.session_state.user_main_topic, 
-                                                  st.session_state.user_subtopics_list, 
-                                                  st.session_state.user_level, mix_next_level=mix_next)
+        final_qs = generate_level_based_questions(
+            st.session_state.user_main_topic, 
+            st.session_state.user_subtopics_list, 
+            st.session_state.user_level, 
+            mix_next_level=mix_next
+        )
         st.session_state.assessment_questions = final_qs
         st.session_state.assessment_answers = [""] * len(final_qs)
         st.session_state.current_step = 5
-        st.experimental_rerun()
+        redirect()
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 5: Final Assessment - Answer Questions
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 elif st.session_state.current_step == 5:
     st.header("Step 5: Final Assessment - Answer the Questions")
     for i, (lvl, subtopic, question) in enumerate(st.session_state.assessment_questions):
@@ -222,11 +232,11 @@ elif st.session_state.current_step == 5:
                                                                key=f"final_ans_{i}")
     if st.button("Submit Final Assessment"):
         st.session_state.current_step = 6
-        st.experimental_rerun()
+        redirect()
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # STEP 6: Final Assessment - Evaluation & Explanation Table
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 elif st.session_state.current_step == 6:
     st.header("Step 6: Final Assessment - Evaluation & Explanation")
     data = []
@@ -254,13 +264,12 @@ elif st.session_state.current_step == 6:
         if st.button("Move to Next Level"):
             st.session_state.user_level = get_next_level(st.session_state.user_level)
             st.session_state.xp += correct_count * 10
-            # Restart the flow for a new cycle (Step 1)
-            st.session_state.current_step = 1
-            st.experimental_rerun()
+            st.session_state.current_step = 1  # Restart flow for a new cycle
+            redirect()
 
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 # DOWNLOAD SUMMARY (available from Step 1 onward)
-# -----------------------------------------------------
+# -------------------------------------------------------------------
 def generate_summary():
     summary = f"Main Topic: {st.session_state.user_main_topic}\n"
     summary += f"Subtopics: {', '.join(st.session_state.user_subtopics_list)}\n"
