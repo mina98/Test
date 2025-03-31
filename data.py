@@ -1,7 +1,7 @@
 import streamlit as st
 from groq import Groq
 
-# Hide the GitHub link and action button in Streamlit
+# Hide the GitHub link and the action button in Streamlit
 hide_github_style = """
 <style>
 a[href="https://github.com/streamlit/streamlit"], .stActionButton {display: none;}
@@ -116,7 +116,7 @@ if st.button("Try Demo Mode"):
     st.session_state.user_main_topic = "Math"
     st.session_state.user_subtopics_list = ["Algebra", "Geometry", "Calculus"]
     st.session_state.loop_count = 0
-    st.stop()  # Updated session state triggers a re-run
+    st.experimental_rerun()
 
 # --------------------- Step 1: Input for Topic and Subtopics (Form) --------------------- #
 if not st.session_state.assessment_completed and not st.session_state.questions_generated:
@@ -135,7 +135,7 @@ if not st.session_state.assessment_completed and not st.session_state.questions_
         st.session_state.user_main_topic = user_main_topic
         subtopics_list = [sub.strip() for sub in user_subtopics.split(',') if sub.strip()]
         st.session_state.user_subtopics_list = subtopics_list
-        st.write(f"Generating questions based on the main topic: {user_main_topic} and subtopics: {', '.join(subtopics_list)}")
+        st.write(f"Generating questions for main topic: {user_main_topic} and subtopics: {', '.join(subtopics_list)}")
         
         # Generate questions for all levels for initial assessment
         level_based_questions = []
@@ -146,17 +146,16 @@ if not st.session_state.assessment_completed and not st.session_state.questions_
         st.session_state.level_based_questions = level_based_questions
         st.session_state.answers = [""] * len(level_based_questions)
         st.session_state.questions_generated = True
-        st.stop()  # Stop execution so updated state is used on next run
+        st.experimental_rerun()
 
 # --------------------- Step 2: Display Questions and Collect Answers --------------------- #
 if st.session_state.questions_generated and not st.session_state.assessment_completed:
     st.header("Answer the following questions:")
     answers = st.session_state.answers
     for i, (level, subtopic, question) in enumerate(st.session_state.level_based_questions):
-        st.write(f"**{level.capitalize()} Level - {subtopic.capitalize()} Question {i + 1}:** {question}")
-        answers[i] = st.text_area(f"Your answer for Question {i + 1}", value=answers[i], key=f"ans_{i}")
+        st.write(f"**{level.capitalize()} Level - {subtopic.capitalize()} Question {i+1}:** {question}")
+        answers[i] = st.text_area(f"Your answer for Question {i+1}", value=answers[i], key=f"ans_{i}")
     if st.button('Submit Answers and Determine Level'):
-        st.write("Thank you for your answers! Analyzing your level...")
         empty_answers = [ans for ans in answers if not ans.strip()]
         correct_answers = len([ans for ans in answers if ans.strip()])
         # Determine level based on percentage of non-empty answers
@@ -177,12 +176,12 @@ if st.session_state.questions_generated and not st.session_state.assessment_comp
         st.session_state.user_level = user_level
         st.session_state.assessment_completed = True
         st.session_state.xp += correct_answers * 10
-        st.stop()
+        st.experimental_rerun()
 
 # --------------------- Step 3: Display Assessment Results & Learning Track --------------------- #
 if st.session_state.assessment_completed and not st.session_state.personalized_track_generated:
     st.header("Assessment Results")
-    st.write(f"Based on your answers, your proficiency level is: **{st.session_state.user_level}**")
+    st.write(f"Your proficiency level is: **{st.session_state.user_level}**")
     st.write(f"**XP Points:** {st.session_state.xp}")
     st.progress(len([ans for ans in st.session_state.answers if ans.strip()]) / len(st.session_state.answers))
     
@@ -193,15 +192,13 @@ if st.session_state.assessment_completed and not st.session_state.personalized_t
         st.write("### Your Personalized Learning Track:")
         st.write(personalized_track)
         st.session_state.personalized_track_generated = True
-        st.stop()
+        st.experimental_rerun()
 
 # --------------------- Step 4: Final Assessment with Evaluation & Explanation --------------------- #
 if st.session_state.personalized_track_generated:
     st.header("Final Assessment on Your Personalized Learning Track")
     if st.button("Start Assessment"):
-        mix_next_level = False
-        if st.session_state.user_level != 'Advanced':
-            mix_next_level = True
+        mix_next_level = st.session_state.user_level != 'Advanced'
         assessment_questions = generate_level_based_questions(
             st.session_state.user_main_topic,
             st.session_state.user_subtopics_list,
@@ -210,32 +207,33 @@ if st.session_state.personalized_track_generated:
         )
         st.session_state.assessment_questions = assessment_questions
         st.session_state.assessment_answers = [""] * len(assessment_questions)
-        st.stop()
+        st.experimental_rerun()
 
 if 'assessment_questions' in st.session_state:
     st.subheader("Answer the following assessment questions:")
     for i, (level, subtopic, question) in enumerate(st.session_state.assessment_questions):
-        st.write(f"**{level.capitalize()} Level - {subtopic.capitalize()} Question {i + 1}:** {question}")
+        st.write(f"**{level.capitalize()} Level - {subtopic.capitalize()} Question {i+1}:** {question}")
         st.session_state.assessment_answers[i] = st.text_area(
-            f"Your answer for Assessment Question {i + 1}", 
+            f"Your answer for Assessment Question {i+1}",
             value=st.session_state.assessment_answers[i],
             key=f"assess_ans_{i}"
         )
-        # Offer evaluation and explanation if an answer is provided
         if st.session_state.assessment_answers[i].strip():
             if st.button("Show Strict Evaluation", key=f"eval_{i}"):
                 evaluation = evaluate_answer(question, st.session_state.assessment_answers[i])
                 st.session_state.evaluations[i] = evaluation
+                st.experimental_rerun()
             if st.session_state.evaluations.get(i):
                 st.write(f"**Evaluation for Question {i+1}:** {st.session_state.evaluations[i]}")
             if st.button("Show Explanation", key=f"explain_{i}"):
                 explanation = generate_explanation(question, st.session_state.assessment_answers[i])
                 st.session_state.explanations[i] = explanation
+                st.experimental_rerun()
             if st.session_state.explanations.get(i):
                 st.write(f"**Explanation for Question {i+1}:** {st.session_state.explanations[i]}")
         else:
             tip = generate_personalized_tip(question, level)
-            st.write(f"Question {i + 1} was not answered. Tip: {tip}")
+            st.write(f"Question {i+1} was not answered. Tip: {tip}")
 
     if st.button("Submit Final Assessment"):
         correct_answers = len([ans for ans in st.session_state.assessment_answers if ans.strip()])
@@ -247,12 +245,11 @@ if 'assessment_questions' in st.session_state:
             st.write("Congratulations! You've progressed to the next level.")
             if st.button("Move to the Next Level"):
                 st.session_state.user_level = get_next_level(st.session_state.user_level)
-                # Reset for a new assessment cycle
                 st.session_state.assessment_completed = False
                 st.session_state.questions_generated = False
                 st.session_state.personalized_track_generated = False
                 st.session_state.loop_count += 1
-                st.stop()
+                st.experimental_rerun()
 
 # --------------------- Optional: Download Progress Summary --------------------- #
 def generate_summary():
